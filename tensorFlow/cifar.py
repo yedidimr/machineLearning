@@ -1,216 +1,32 @@
+import time
 import tensorflow as tf
 import numpy as np
 import pickle
 import os
+import data
 
-########################################################################
 
-# Directory where you want to download and save the data-set.
-# Set this before you start calling any of the functions below.
-data_path = "/home/student-5/Downloads"
+print "loading data..."
+##tiny image net
+# train_images, train_labels, test_images, test_lables, img_size, out_size = data.prepare_imagenet_data() #tiny image net
+# train_images = tf.reshape(train_images, [-1, img_size, img_size, 3])
+# test_images = tf.reshape(test_images, [-1, img_size, img_size, 3])
+##cifar
+train_images, train_labels, test_images, test_lables, img_size, out_size = data.prepare_cifar_data()
+train_images = train_images.astype('float32')
+test_images = test_images.astype('float32') #must convert to float!!
 
-# URL for the data-set on the internet.
-data_url = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
+print "done loading data"
 
-########################################################################
-# Various constants for the size of the images.
-# Use these constants in your own program.
+train_cls_vec = train_labels
+test_cls_vec = test_lables
 
-# Width and height of each image.
-img_size = 32
 
-# Number of channels in each image, 3 channels: Red, Green, Blue.
-num_channels = 3
+print "loading data"
+t0 = time.time()
+t1 = time.time()
+print "data took %d" %(t1-t0)
 
-# Length of an image when flattened to a 1-dim array.
-img_size_flat = img_size * img_size * num_channels
-
-# Number of classes.
-num_classes = 10
-
-########################################################################
-# Various constants used to allocate arrays of the correct size.
-
-# Number of files for the training-set.
-_num_files_train = 5
-
-# Number of images for each batch-file in the training-set.
-_images_per_file = 10000
-
-# Total number of images in the training-set.
-# This is used to pre-allocate arrays for efficiency.
-_num_images_train = _num_files_train * _images_per_file
-
-########################################################################
-# Private functions for downloading, unpacking and loading data-files.
-
-
-def one_hot_encoded(class_numbers, num_classes=None):
-    """
-    Generate the One-Hot encoded class-labels from an array of integers.
-    For example, if class_number=2 and num_classes=4 then
-    the one-hot encoded label is the float array: [0. 0. 1. 0.]
-    :param class_numbers:
-        Array of integers with class-numbers.
-        Assume the integers are from zero to num_classes-1 inclusive.
-    :param num_classes:
-        Number of classes. If None then use max(class_numbers)+1.
-    :return:
-        2-dim array of shape: [len(class_numbers), num_classes]
-    """
-
-    # Find the number of classes if None is provided.
-    # Assumes the lowest class-number is zero.
-    if num_classes is None:
-        num_classes = np.max(class_numbers) + 1
-
-    return np.eye(num_classes, dtype=float)[class_numbers]
-
-
-def _get_file_path(filename=""):
-    """
-    Return the full path of a data-file for the data-set.
-    If filename=="" then return the directory of the files.
-    """
-
-    return os.path.join(data_path, "cifar-10-batches-py/", filename)
-
-
-def _unpickle(filename):
-    """
-    Unpickle the given file and return the data.
-    Note that the appropriate dir-name is prepended the filename.
-    """
-
-    # Create full path for the file.
-    file_path = _get_file_path(filename)
-
-    print("Loading data: " + file_path)
-
-    with open(file_path, mode='rb') as file:
-        # In Python 3.X it is important to set the encoding,
-        # otherwise an exception is raised here.
-        data = pickle.load(file)# encoding='bytes')
-
-    return data
-
-
-def _convert_images(raw):
-    """
-    Convert images from the CIFAR-10 format and
-    return a 4-dim array with shape: [image_number, height, width, channel]
-    where the pixels are floats between 0.0 and 1.0.
-    """
-
-    # Convert the raw images from the data-files to floating-points.
-    raw_float = np.array(raw, dtype=float) / 255.0
-
-    # Reshape the array to 4-dimensions.
-    images = raw_float.reshape([-1, num_channels, img_size, img_size])
-
-    # Reorder the indices of the array.
-    images = images.transpose([0, 2, 3, 1])
-
-    return images
-
-
-def _load_data(filename):
-    """
-    Load a pickled data-file from the CIFAR-10 data-set
-    and return the converted images (see above) and the class-number
-    for each image.
-    """
-
-    # Load the pickled data-file.
-    data = _unpickle(filename)
-
-    # Get the raw images.
-    raw_images = data[b'data']
-
-    # Get the class-numbers for each image. Convert to numpy-array.
-    cls = np.array(data[b'labels'])
-
-    # Convert the images.
-    images = _convert_images(raw_images)
-
-    return images, cls
-
-
-########################################################################
-# Public functions that you may call to download the data-set from
-# the internet and load the data into memory.
-
-
-
-def load_class_names():
-    """
-    Load the names for the classes in the CIFAR-10 data-set.
-    Returns a list with the names. Example: names[3] is the name
-    associated with class-number 3.
-    """
-
-    # Load the class-names from the pickled file.
-    raw = _unpickle(filename="batches.meta")[b'label_names']
-
-    # Convert from binary strings.
-    names = [x.decode('utf-8') for x in raw]
-
-    return names
-
-
-def load_training_data():
-    """
-    Load all the training-data for the CIFAR-10 data-set.
-    The data-set is split into 5 data-files which are merged here.
-    Returns the images, class-numbers and one-hot encoded class-labels.
-    """
-
-    # Pre-allocate the arrays for the images and class-numbers for efficiency.
-    images = np.zeros(shape=[_num_images_train, img_size, img_size, num_channels], dtype=float)
-    cls = np.zeros(shape=[_num_images_train], dtype=int)
-
-    # Begin-index for the current batch.
-    begin = 0
-
-    # For each data-file.
-    for i in range(_num_files_train):
-        # Load the images and class-numbers from the data-file.
-        images_batch, cls_batch = _load_data(filename="data_batch_" + str(i + 1))
-
-        # Number of images in this batch.
-        num_images = len(images_batch)
-
-        # End-index for the current batch.
-        end = begin + num_images
-
-        # Store the images into the array.
-        images[begin:end, :] = images_batch
-
-        # Store the class-numbers into the array.
-        cls[begin:end] = cls_batch
-
-        # The begin-index for the next batch is the current end-index.
-        begin = end
-
-    return images, cls, one_hot_encoded(class_numbers=cls, num_classes=num_classes)
-
-
-def load_test_data():
-    """
-    Load all the test-data for the CIFAR-10 data-set.
-    Returns the images, class-numbers and one-hot encoded class-labels.
-    """
-
-    images, cls = _load_data(filename="test_batch")
-
-    return images, cls, one_hot_encoded(class_numbers=cls, num_classes=num_classes)
-
-
-
-
-images, cls_res, labels = load_training_data()
-print images.shape, "images.shape"
-print labels.shape, "labels.shape"
 # images shape is  (50000, 32, 32, 3)  (50000 images of 32X32, 3 channels RGB)
 # cls_res shape is  (50000,)  contains the number of class for each sample (from 0 to 9)
 # labels shape is  (50000,10) holdes a binary vector for each sample with 1 in the index representing the class number
@@ -218,76 +34,260 @@ print labels.shape, "labels.shape"
 
 
 
-x_ = tf.placeholder(tf.float32, shape=[None,32,32,3], name = 'x-input') # input: 32X32 image, RGB channels
-y_ = tf.placeholder(tf.float32, shape=[None,10], name = 'y-input')  # output: 10 optional classes
+x_ = tf.placeholder(tf.float32, shape=[None, img_size, img_size, 3], name = 'x-input') # tiny imagenet RGB channels
+# x_ = tf.placeholder(tf.float32, shape=[None,img_size, img_size,3], name = 'x-input') # cifar input: 32X32 image, RGB channels
+y_ = tf.placeholder(tf.float32, shape=[None,out_size], name = 'y-input')  # output: 10 optional classes
 
 
-
-
-W1 = tf.Variable(tf.truncated_normal([5, 5, 3, 16]), name ="weight1")  # 5X5 filter, 16 filters, 3 input channgels (depth)
-B1 = tf.Variable(tf.zeros([16]), name = "bias1")
-
-W2 = tf.Variable(tf.truncated_normal([5, 5, 16, 20]), name ="weight2")  # 5X5 filter, 20 filters,
-B2 = tf.Variable(tf.zeros([20]), name = "bias2")
-
-W3 = tf.Variable(tf.truncated_normal([5, 5, 20, 20]), name ="weight3")  # 5X5 filter, 20 filters,
-B3 = tf.Variable(tf.zeros([20]), name = "bias3")
-
-W4 = tf.Variable(tf.truncated_normal([320, 10]), name ="weight4")  # 5X5 filter, 20 filters,
-B4 = tf.Variable(tf.zeros([10]), name = "bias4")
 
 stride = 1
 with tf.name_scope("hidden1") as scope:
+    W1 = tf.Variable(tf.truncated_normal([5, 5, 3, 16], stddev=0.1),name="weight1")  # 5X5 filter, 16 filters, 3 input channgels (depth)
+    B1 = tf.Variable(tf.zeros([16]), name="bias1")
+    # B1 =tf.Variable(tf.constant(0.0, shape=[16], dtype=tf.float32), trainable=True, name='biases')
     out1 = tf.nn.relu(tf.nn.conv2d(x_, W1, strides=[1, 1, 1, 1], padding='SAME') + B1)  #activation - relu, padding -
     pool1 = tf.nn.max_pool(out1, ksize = [1,2,2,1], strides=[1, 2, 2, 1], padding='SAME')
 
 with tf.name_scope("hidden2") as scope:
+    W2 = tf.Variable(tf.truncated_normal([5, 5, 16, 20], stddev=0.1), name="weight2")  # 5X5 filter, 20 filters,
+    B2 = tf.Variable(tf.zeros([20]), name="bias2")
+    # B2 = tf.Variable(tf.constant(0.0, shape=[20], dtype=tf.float32), trainable=True, name='biases')
     out2 = tf.nn.relu(tf.nn.conv2d(pool1, W2, strides=[1, stride, stride, 1], padding='SAME') + B2)  #activation - relu, padding -
     pool2 = tf.nn.max_pool(out2, ksize = [1,2,2,1], strides=[1, 2, 2, 1], padding='SAME')
 
 with tf.name_scope("hidden3") as scope:
+    W3 = tf.Variable(tf.truncated_normal([5, 5, 20, 20], stddev=0.1), name="weight3")  # 5X5 filter, 20 filters,
+    B3 = tf.Variable(tf.zeros([20]), name="bias3")
+    # B3 = tf.Variable(tf.constant(0.0, shape=[20], dtype=tf.float32), trainable=True, name='biases')
     out3 = tf.nn.relu(tf.nn.conv2d(pool2, W3, strides=[1, stride, stride, 1], padding='SAME') + B3)  #activation - relu, padding -
+
     pool3 = tf.nn.max_pool(out3, ksize = [1,2,2,1], strides=[1, 2, 2, 1], padding='SAME')
 
 with tf.name_scope("hidden4") as scope:
+    shape = pool3.shape[1] * pool3.shape[2] * pool3.shape[3]
+    W4 = tf.Variable(tf.truncated_normal([shape.value, 10], stddev=0.1), name="weight4")  # 5X5 filter, 20 filters,
+    B4 = tf.Variable(tf.zeros([10]), name="bias4")
+    # B4 =tf.Variable(tf.constant(0.0, shape=[10], dtype=tf.float32), trainable=True, name='biases')
     # flatten pool 3 to be ready for fully connected NN
-    print "pool shape before", pool3.shape
-    pool3 = tf.reshape(pool3, [-1, pool3.shape[1] * pool3.shape[2] * pool3.shape[3]])
-    print "pool shape after", pool3.shape
-    print "YAY"
+    pool3 = tf.reshape(pool3, [-1, shape])
     logits = tf.matmul(pool3, W4) + B4
-    cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=y_) # cost function? activation function?
 
+cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=y_) # cost function? activation function?
+cross_entropy = tf.reduce_mean(cross_entropy)
 
-
-train_step = tf.train.AdamOptimizer(0.0001).minimize(cross_entropy)
+train_step = tf.train.AdamOptimizer(0.01).minimize(cross_entropy)
 
 Y = tf.nn.softmax(logits)
 is_correct = tf.equal(tf.argmax(Y, 1), tf.argmax(y_, 1))
-print "is-correct", is_correct.shape
 accuracy = tf.reduce_mean(tf.cast(is_correct, tf.float32))
+
+tf.summary.scalar('accuracy', accuracy)
+tf.summary.scalar('cross_entropy_loss', cross_entropy)
+merged = tf.summary.merge_all()
 
 init = tf.initialize_all_variables()
 sess = tf.Session()
 sess.run(init)
 
+# merged = tf.summary.merge_all()
+# writer = tf.summary.FileWriter("./logs/xor_logs", sess.graph_def)
+train_writer = tf.summary.FileWriter("logs/cifar/train", sess.graph)
+test_writer = tf.summary.FileWriter("logs/cifar/test")
 
-writer = tf.summary.FileWriter("./logs/xor_logs", sess.graph_def)
-
-for i in range(7000):
-    indices = np.random.randint(0, images.shape[0], 100)
-    X_data, Y_data = images[indices, :, :, :], labels[indices]
+for i in range(100000):
+    indices = np.random.randint(0, train_images.shape[0], 100)
+    X_data, Y_data = train_images[indices, :, :, :], train_labels[indices]
+    # print Y_data.shape
 
     sess.run(train_step, feed_dict={x_: X_data, y_: Y_data})
 
     if i % 100 == 0:
+        # summary = sess.run(merged, feed_dict={x_: X_data, y_: Y_data})
+        # train_writer.add_summary(summary, i)
         # ce = sess.run(cross_entropy, feed_dict={x_: X_data, y_: Y_data})
         # pred = sess.run(Y, feed_dict={x_: X_data, y_: Y_data})
-        a = sess.run(accuracy, feed_dict={x_: X_data, y_: Y_data})
-        print "accuracy", a
-        # print "cross_entropy", ce
-import pdb
+        a, ce = sess.run([accuracy, cross_entropy], feed_dict={x_: X_data, y_: Y_data})
+        summary = sess.run(merged, feed_dict={x_: X_data, y_: Y_data})
+        print "iteration", i, "accuracy", a, "cross entropy", ce
+        train_writer.add_summary(summary, i)
 
+    if i % 500 == 0:
+        batch_x_test, batch_y_test = test_images, test_lables
+        cost_empirical, accuracy_empirical = sess.run([cross_entropy, accuracy], feed_dict={x_: batch_x_test, y_: batch_y_test})
+        summary = sess.run(merged, feed_dict={x_: batch_x_test, y_: batch_y_test})
+        test_writer.add_summary(summary, i)
+        print("Test cost: {}, Test accuracy: {}".format(cost_empirical, accuracy_empirical))
+import pdb
+pdb.set_trace()
+
+#
+#
+#
+# def weight_variable(shape):
+#     initial = tf.truncated_normal(shape, stddev=0.1)
+#     return tf.Variable(initial)
+#
+# def bias_variable(shape):
+#     initial = tf.constant(0.1, shape=shape)
+#     return tf.Variable(initial)
+#
+# def conv2d(x, W):
+#     return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
+#
+# def max_pool_2x2(x):
+#     return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+#
+# def tensor_to_image(T,channel_num):
+#     T_single_input = T[0:1,:,:,channel_num:channel_num+1]
+#     x_min = tf.reduce_min(T_single_input)
+#     x_max = tf.reduce_max(T_single_input)
+#     W_0_to_1 = (T_single_input - x_min) / (x_max - x_min)
+#     W_0_to_255_uint8 = tf.image.convert_image_dtype(W_0_to_1, dtype=tf.uint8)
+#     return W_0_to_255_uint8
+#     # W_transposed = tf.transpose(W_0_to_255_uint8, [3, 0, 1, 2])
+#     # return W_transposed
+#
+#
+# def deepnn(x):
+#
+#     # image_size = 32
+#     conv1_shape = [5,5,3,32]
+#     conv2_shape = [5,5,32,20]
+#     conv3_shape = [5,5,20,20]
+#     fc1_shape = 4 * 4 * 20
+#
+#
+#     with tf.name_scope('conv1'):
+#         W_conv1 = weight_variable(conv1_shape)
+#         b_conv1 = bias_variable([conv1_shape[-1]])
+#         h_conv1 = tf.nn.relu(conv2d(x, W_conv1) + b_conv1)
+#
+#         for i in range(6):
+#             h_conv1_images = tensor_to_image(h_conv1,i)
+#             tf.summary.image('conv1 - output '+str(i), h_conv1_images, max_outputs=16)
+#
+#     with tf.name_scope('pool1'):
+#         h_pool1 = max_pool_2x2(h_conv1)
+#
+#     with tf.name_scope('conv2'):
+#         W_conv2 = weight_variable(conv2_shape)
+#         b_conv2 = bias_variable([conv2_shape[-1]])
+#         h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
+#
+#     with tf.name_scope('pool2'):
+#         h_pool2 = max_pool_2x2(h_conv2)
+#
+#     with tf.name_scope('conv3'):
+#         W_conv3 = weight_variable(conv3_shape)
+#         b_conv3 = bias_variable([conv3_shape[-1]])
+#         h_conv3 = tf.nn.relu(conv2d(h_pool2, W_conv3) + b_conv3)
+#
+#     with tf.name_scope('pool3'):
+#         h_pool3 = max_pool_2x2(h_conv3)
+#
+#
+#
+#     # with tf.name_scope('dropout'):
+#     #     keep_prob = tf.placeholder(tf.float32)
+#     #     h_fc1_drop = tf.nn.dropout(h_fc1, keep_prob)
+#
+#     with tf.name_scope('fc1'):
+#         h_pool3_flat = tf.reshape(h_pool3, [-1, fc1_shape])
+#         W_fc1 = weight_variable([fc1_shape, 10])
+#         b_fc1 = bias_variable([10])
+#         y_conv = tf.matmul(h_pool3_flat, W_fc1) + b_fc1
+#
+#     return y_conv
+#
+# def get_batch_data(x,y,batch_size):
+#
+#     # perm = np.random.permutation(range(x.shape[0]), batch_size)
+#     batch_idxs = np.random.choice(range(x.shape[0]), batch_size, replace=False)
+#     batch_x = x[batch_idxs,:,:,:]
+#     batch_y = y[batch_idxs,:]
+#     return batch_x, batch_y
+#
+#
+#
+#
+#
+# def main(_):
+#
+#
+#     x = tf.placeholder(tf.float32, shape=[None, 32, 32, 3])
+#     y_ = tf.placeholder(tf.float32, shape=[None, 10])
+#
+#     y_conv = deepnn(x)
+#
+#     with tf.name_scope('cross_entropy_loss'):
+#         cross_entropy = tf.nn.softmax_cross_entropy_with_logits(labels=y_, logits=y_conv)
+#         cross_entropy = tf.reduce_mean(cross_entropy)
+#
+#     tf.summary.scalar('cross_entropy_loss', cross_entropy)
+#
+#     with tf.name_scope('adam_optimizer'):
+#         train_step = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
+#
+#     with tf.name_scope('accuracy'):
+#         correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
+#         correct_prediction = tf.cast(correct_prediction, tf.float32)
+#
+#         accuracy = tf.reduce_mean(correct_prediction)
+#
+#
+#     tf.summary.scalar('accuracy', accuracy)
+#
+#
+#     merged = tf.summary.merge_all()
+#
+#
+#
+#     Iterations = 500*500
+#     batch_size = 100
+#
+#     tolerance = 1e-7
+#     t0 = time.time()
+#
+#
+#     with tf.Session() as sess:
+#         train_writer = tf.summary.FileWriter("logs/cifar/train", sess.graph)
+#         test_writer = tf.summary.FileWriter("logs/cifar/test")
+#         sess.run(tf.global_variables_initializer())
+#         old_cost = 0.0
+#         for i in range(Iterations):
+#             batch_x, batch_y = get_batch_data(train_images, train_cls_vec, batch_size)
+#             sess.run(train_step, feed_dict={x: batch_x, y_: batch_y})
+#             new_cost = sess.run(cross_entropy, feed_dict={x: batch_x, y_: batch_y})
+#
+#             if(np.square(new_cost-old_cost) < tolerance):
+#                 batch_x_test, batch_y_test = test_images, test_cls_vec
+#                 cost_empirical, accuracy_empirical = sess.run([cross_entropy, accuracy], feed_dict={x: batch_x_test, y_: batch_y_test})
+#                 summary = sess.run(merged, feed_dict={x: batch_x_test, y_: batch_y_test})
+#                 test_writer.add_summary(summary, i)
+#                 print("Iteration {}, Test cost: {}, Test accuracy: {}".format(i,cost_empirical, accuracy_empirical))
+#                 print("tolerance {} reached, stopping".format(tolerance))
+#                 break
+#
+#             if i % 100 == 0:
+#                 cost_empirical, accuracy_empirical = sess.run([cross_entropy, accuracy], feed_dict={x: batch_x, y_: batch_y})
+#                 summary = sess.run(merged, feed_dict={x: batch_x, y_: batch_y})
+#                 train_writer.add_summary(summary, i)
+#                 print("Iteration {}, time passed: {}, train cost: {}, train accuracy: {}".format(i, time.time() - t0 , cost_empirical, accuracy_empirical))
+#             #
+#             # if i % 500 == 0:
+#             #     batch_x_test, batch_y_test = test_images, test_cls_vec
+#             #     cost_empirical, accuracy_empirical = sess.run([cross_entropy, accuracy], feed_dict={x: batch_x_test, y_: batch_y_test})
+#             #     summary = sess.run(merged, feed_dict={x: batch_x_test, y_: batch_y_test})
+#             #     test_writer.add_summary(summary, i)
+#             #     print("Test cost: {}, Test accuracy: {}".format(cost_empirical, accuracy_empirical))
+#
+#
+#
+# if __name__ == '__main__':
+#     tf.app.run(main=main)
+
+
+import pdb
 pdb.set_trace()
 
 
