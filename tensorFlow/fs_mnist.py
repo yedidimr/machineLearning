@@ -3,9 +3,11 @@ from tensorflow.examples.tutorials.mnist import input_data as mnist_data
 from sklearn.utils import shuffle
 from tensorflow.contrib.layers import flatten
 
+
+
 EPOCHS = 10
 BATCH_SIZE = 128
-
+FS_LAMBDA = 0.4
 
 def LeNet(x, output_size = 10):
     # Hyperparameters
@@ -18,7 +20,7 @@ def LeNet(x, output_size = 10):
         'layer_f1': 84
     }
 
-    # Layer 1: Convolutional. Input = 32x32x1. Output = 28x28x6.
+    # Layer 1: Convolutional. Input = 28x28x1. Output = 28x28x6.
     conv1_w = tf.Variable(tf.truncated_normal(shape=[5, 5, 1, 6], mean=mu, stddev=sigma))
     conv1_b = tf.Variable(tf.zeros(6))
     conv1 = tf.nn.conv2d(x, conv1_w, strides=[1, 1, 1, 1], padding='VALID') + conv1_b
@@ -67,7 +69,11 @@ def evaluate(X_data, y_data):
     total_accuracy = 0
     sess = tf.get_default_session()
     for offset in range(0, num_examples, BATCH_SIZE):
-        batch_x, batch_y = X_data[offset:offset+BATCH_SIZE], y_data[offset:offset+BATCH_SIZE]
+        end = offset + BATCH_SIZE
+        if num_examples - end < BATCH_SIZE:
+            print "next"
+            continue
+        batch_x, batch_y = X_data[offset:end], y_data[offset:end]
         accuracy = sess.run(accuracy_operation, feed_dict={x: batch_x, y: batch_y})
         total_accuracy += (accuracy * len(batch_x))
     return total_accuracy / num_examples
@@ -102,7 +108,7 @@ zeros_ones_indices = zeros_indices | ones_indices
 X_validation = mnist.validation.images[zeros_ones_indices ]
 y_validation = mnist.validation.labels[zeros_ones_indices ]
 
-
+## to use all the data
 # X_train, y_train           = mnist.train.images, mnist.train.labels
 # X_validation, y_validation = mnist.validation.images, mnist.validation.labels
 # X_test, y_test             = mnist.test.images, mnist.test.labels
@@ -121,9 +127,23 @@ one_hot_y = tf.one_hot(y, output_size)
 
 rate = 0.001
 
-logits = LeNet(x, output_size)
+
+
+#FS LAYER
+# W_fs = tf.Variable(tf.truncated_normal([1, 28,28,1], stddev=0.1), name ="Theta1")  #weights
+# ##option 1
+W_fs = tf.get_variable(name="fs",shape=[1, 28,28,1],regularizer=tf.contrib.layers.l1_regularizer(1.0))
+W_fs = tf.tile(W_fs ,[BATCH_SIZE,1,1,1])
+
+regLosses=tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+l1=tf.reduce_sum(tf.abs(regLosses))
+out = tf.multiply(x, W_fs ) #element wise product
+logits = LeNet(out, output_size)
 cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=one_hot_y)
-loss_operation = tf.reduce_mean(cross_entropy)
+# l1_regularizer = tf.contrib.layers.l1_regularizer(scale=FS_LAMBDA, scope=None)
+# regularization_penalty = tf.contrib.layers.apply_regularization(l1_regularizer, W_fs) #FS_LAMBDA/BATCH_SIZE*tf.reduce_sum(tf.abs(W_fs))
+# loss_operation = tf.reduce_mean(cross_entropy) +regularization_penalty
+loss_operation = tf.reduce_mean(cross_entropy) +l1
 
 # optimizer = tf.train.AdamOptimizer(learning_rate = rate)
 # training_operation = optimizer.minimize(loss_operation)
@@ -148,8 +168,12 @@ with tf.Session() as sess:
     print()
     for i in range(EPOCHS):
         X_train, y_train = shuffle(X_train, y_train)
+        print "num_examples", num_examples
         for offset in range(0, num_examples, BATCH_SIZE):
             end = offset + BATCH_SIZE
+            if num_examples - end < BATCH_SIZE:
+                print "next"
+                continue
             batch_x, batch_y = X_train[offset:end], y_train[offset:end]
             sess.run(training_operation, feed_dict={x: batch_x, y: batch_y})
 
@@ -158,6 +182,12 @@ with tf.Session() as sess:
         print("Validation Accuracy = {:.3f}".format(validation_accuracy))
         print()
 
+    import cv2
+    img = sess.run(W_fs)
+    import pdb
+    pdb.set_trace()
+    cv2.imshow("w", img)
+    cv2.waitKey(0)
     saver.save(sess, './lenet')
     print("Model saved")
 
