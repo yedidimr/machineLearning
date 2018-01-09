@@ -5,16 +5,25 @@ import cv2
 image_path1 = "/home/reut/Downloads/apple.jpg"
 image_path2 = "/home/reut/Downloads/raccoon.png"
 
-plot_i = 0
-def plot(img, title, n_rows=4, n_cols=2):
-    global plot_i
-    assert plot_i < n_rows * n_cols
-    plot_i += 1
-    plt.subplot(n_rows, n_cols, plot_i)
-    plt.imshow(img, cmap='gray')
-    plt.title(title)
-    plt.xticks([])
-    plt.yticks([])
+class ImagePlot(object):
+    def __init__(self, n_rows, n_cols):
+        self._plot_i = 0
+        self.n_rows = n_rows
+        self.n_cols = n_cols
+
+    def add_img(self, img, title):
+        assert self._plot_i < self.n_rows * self.n_cols
+        self._plot_i += 1
+        plt.subplot(self.n_rows, self.n_cols, self._plot_i)
+        plt.imshow(img, cmap='gray')
+        plt.title(title)
+        plt.xticks([])
+        plt.yticks([])
+
+    def show(self):
+        plt.show()
+        self._plot_i = 0
+
 
 
 def extract(image):
@@ -65,14 +74,14 @@ visible_magnitude2 = 20*np.log(magnitude2)
 
 
 # display output
-plot_i = 0
-plot(img, 'Input img 1')
-plot(img2, 'Input img 2')
-plot(visible_magnitude, 'Magnitude Spectrum img 1')
-plot(visible_magnitude2, 'Magnitude Spectrum img 2')
+plot = ImagePlot(n_rows = 4, n_cols = 2)
+plot.add_img(img, 'Input img 1')
+plot.add_img(img2, 'Input img 2')
+plot.add_img(visible_magnitude, 'Magnitude Spectrum img 1')
+plot.add_img(visible_magnitude2, 'Magnitude Spectrum img 2')
 
-plot(phase, 'Phase Spectrum img 1')
-plot(phase2, 'Phase Spectrum img 2')
-plot(img_back, 'New img - phase of img1')
-plot(img_back2, 'New img - phase of img2')
-plt.show()
+plot.add_img(phase, 'Phase Spectrum img 1')
+plot.add_img(phase2, 'Phase Spectrum img 2')
+plot.add_img(img_back, 'New img - phase of img1')
+plot.add_img(img_back2, 'New img - phase of img2')
+plot.show()
